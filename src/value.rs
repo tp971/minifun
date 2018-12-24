@@ -26,6 +26,16 @@ impl Value {
                 Rc::new(Value::Real(-num)),
             (Token::BANG, Value::Bool(b)) =>
                 Rc::new(Value::Bool(!b)),
+
+            (Token::PLUS, Value::Tuple(l))
+          | (Token::MINUS, Value::Tuple(l))
+          | (Token::BANG, Value::Tuple(l)) => {
+                let mut res = Vec::new();
+                for l in l {
+                    res.push(l.eval_unary(token)?);
+                }
+                Rc::new(Value::Tuple(res))
+            },
             (_, val) =>
                 return Err(format!("invalid value for unary {}: {}", token, val))
         })
@@ -49,6 +59,7 @@ impl Value {
                 s2.push(*c);
                 Rc::new(Value::Str(s2, llen + 1))
             },
+
             (Token::MINUS, Value::Int(l), Value::Int(r)) =>
                 match l.checked_sub(*r) {
                     Some(res) =>
@@ -91,6 +102,7 @@ impl Value {
                 },
             (Token::SLASH, Value::Real(l), Value::Real(r)) =>
                 Rc::new(Value::Real(l / r)),
+
             (Token::PERCENT, Value::Int(l), Value::Int(r)) =>
                 if *r == 0 {
                     return Err("division by zero".to_string())
@@ -114,13 +126,39 @@ impl Value {
             (Token::GREATEREQ, Value::Int(l), Value::Int(r)) =>
                 Rc::new(Value::Bool(l >= r)),
 
+            (Token::LESS, Value::Real(l), Value::Real(r)) =>
+                Rc::new(Value::Bool(l < r)),
+            (Token::LESSEQ, Value::Real(l), Value::Real(r)) =>
+                Rc::new(Value::Bool(l <= r)),
+            (Token::GREATER, Value::Real(l), Value::Real(r)) =>
+                Rc::new(Value::Bool(l > r)),
+            (Token::GREATEREQ, Value::Real(l), Value::Real(r)) =>
+                Rc::new(Value::Bool(l >= r)),
+
+            (Token::LESS, Value::Str(l, _), Value::Str(r, _)) =>
+                Rc::new(Value::Bool(l < r)),
+            (Token::LESSEQ, Value::Str(l, _), Value::Str(r, _)) =>
+                Rc::new(Value::Bool(l <= r)),
+            (Token::GREATER, Value::Str(l, _), Value::Str(r, _)) =>
+                Rc::new(Value::Bool(l > r)),
+            (Token::GREATEREQ, Value::Str(l, _), Value::Str(r, _)) =>
+                Rc::new(Value::Bool(l >= r)),
+
             (Token::EQ, Value::Int(l), Value::Int(r)) =>
                 Rc::new(Value::Bool(l == r)),
             (Token::EQ, Value::Bool(l), Value::Bool(r)) =>
                 Rc::new(Value::Bool(l == r)),
+            (Token::EQ, Value::Char(l), Value::Char(r)) =>
+                Rc::new(Value::Bool(l == r)),
+            (Token::EQ, Value::Str(l, _), Value::Str(r, _)) =>
+                Rc::new(Value::Bool(l == r)),
             (Token::BANGEQ, Value::Int(l), Value::Int(r)) =>
                 Rc::new(Value::Bool(l != r)),
             (Token::BANGEQ, Value::Bool(l), Value::Bool(r)) =>
+                Rc::new(Value::Bool(l != r)),
+            (Token::BANGEQ, Value::Char(l), Value::Char(r)) =>
+                Rc::new(Value::Bool(l != r)),
+            (Token::BANGEQ, Value::Str(l, _), Value::Str(r, _)) =>
                 Rc::new(Value::Bool(l != r)),
 
             (Token::EQ, Value::Tuple(l), Value::Tuple(r)) => {
