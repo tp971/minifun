@@ -49,9 +49,25 @@ impl Value {
                         Rc::new(Value::Int(res)),
                     None => 
                         return Err("integer overflow".to_string())
-                }
+                },
             (Token::PLUS, Value::Real(l), Value::Real(r)) =>
                 Rc::new(Value::Real(l + r)),
+            (Token::PLUS, Value::Char(l), Value::Int(r)) => {
+                let res_i = match (*l as i64).checked_add(*r) {
+                    Some(res) => res,
+                    None =>
+                        return Err("integer overflow".to_string())
+                };
+                if res_i < 0 || res_i > u32::max_value() as i64 {
+                    return Err("integer overflow".to_string())
+                }
+                match std::char::from_u32(res_i as u32) {
+                    Some(res) =>
+                        Rc::new(Value::Char(res)),
+                    None =>
+                        return Err("integer overflow".to_string())
+                }
+            },
             (Token::PLUS, Value::Str(l, llen), Value::Str(r, rlen)) =>
                 Rc::new(Value::Str(l.clone() + &r, llen + rlen)),
             (Token::PLUS, Value::Str(l, llen), Value::Char(c)) => {
@@ -64,9 +80,27 @@ impl Value {
                 match l.checked_sub(*r) {
                     Some(res) =>
                         Rc::new(Value::Int(res)),
+                    None =>
+                        return Err("integer overflow".to_string())
+                },
+            (Token::MINUS, Value::Char(l), Value::Int(r)) => {
+                let res_i = match (*l as i64).checked_sub(*r) {
+                    Some(res) => res,
+                    None =>
+                        return Err("integer overflow".to_string())
+                };
+                if res_i < 0 || res_i > u32::max_value() as i64 {
+                    return Err("integer overflow".to_string())
+                }
+                match std::char::from_u32(res_i as u32) {
+                    Some(res) =>
+                        Rc::new(Value::Char(res)),
                     None => 
                         return Err("integer overflow".to_string())
                 }
+            },
+            (Token::MINUS, Value::Char(l), Value::Char(r)) =>
+                Rc::new(Value::Int(*l as i64 - *r as i64)),
             (Token::MINUS, Value::Real(l), Value::Real(r)) =>
                 Rc::new(Value::Real(l - r)),
 
@@ -133,6 +167,15 @@ impl Value {
             (Token::GREATER, Value::Real(l), Value::Real(r)) =>
                 Rc::new(Value::Bool(l > r)),
             (Token::GREATEREQ, Value::Real(l), Value::Real(r)) =>
+                Rc::new(Value::Bool(l >= r)),
+
+            (Token::LESS, Value::Char(l), Value::Char(r)) =>
+                Rc::new(Value::Bool(l < r)),
+            (Token::LESSEQ, Value::Char(l), Value::Char(r)) =>
+                Rc::new(Value::Bool(l <= r)),
+            (Token::GREATER, Value::Char(l), Value::Char(r)) =>
+                Rc::new(Value::Bool(l > r)),
+            (Token::GREATEREQ, Value::Char(l), Value::Char(r)) =>
                 Rc::new(Value::Bool(l >= r)),
 
             (Token::LESS, Value::Str(l, _), Value::Str(r, _)) =>
