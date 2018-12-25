@@ -300,12 +300,15 @@ impl Exp {
                 let mut res = Vec::new();
                 let mut is_value = true;
                 for exp in exps {
-                    let val = exp.eval_max(scope, depth - 1)?;
-                    match val {
-                        Partial::Value(_) => {},
-                        _ => { is_value = false; }
+                    if is_value {
+                        let val = exp.eval_max(scope, depth - 1)?;
+                        if let Partial::Exp(_) = val {
+                            is_value = false;
+                        }
+                        res.push(val);
+                    } else {
+                        res.push(Partial::Exp(Rc::clone(exp)));
                     }
-                    res.push(val);
                 }
 
                 if is_value {
@@ -321,9 +324,9 @@ impl Exp {
                 let rval = rhs.eval_max(scope, depth - 1)?;
                 let rval = match rval {
                     Partial::Value(val) => val,
-                    rpart => {
-                        return Ok(Partial::Exp(
-                            Rc::new(Exp::Unary(token.clone(), op.clone(), rpart.into_exp()))));
+                    Partial::Exp(part) => {
+                        return Ok(Partial::Exp(Rc::new(Exp::Unary(
+                            token.clone(), op.clone(), part))));
                     }
                 };
 
@@ -339,9 +342,9 @@ impl Exp {
                         let lval = lhs.eval_max(scope, depth - 1)?;
                         let lval = match lval {
                             Partial::Value(val) => val,
-                            lpart =>
-                                return Ok(Partial::Exp(
-                                    Rc::new(Exp::Binary(token.clone(), op.clone(), lpart.into_exp(), Rc::clone(rhs)))))
+                            Partial::Exp(part) =>
+                                return Ok(Partial::Exp(Rc::new(Exp::Binary(
+                                    token.clone(), op.clone(), part, Rc::clone(rhs)))))
                         };
 
                         let short =
@@ -358,11 +361,9 @@ impl Exp {
                                 let rval = rhs.eval_max(scope, depth - 1)?;
                                 let rval = match rval {
                                     Partial::Value(val) => val,
-                                    rpart =>
-                                        return Ok(Partial::Exp(
-                                            Rc::new(Exp::Binary(token.clone(), op.clone(),
-                                                Rc::new(Exp::Value(Rc::clone(&lval))),
-                                                rpart.into_exp()))))
+                                    Partial::Exp(part) =>
+                                        return Ok(Partial::Exp(Rc::new(Exp::Binary(
+                                            token.clone(), op.clone(), Rc::new(Exp::Value(lval)), part))))
                                 };
                                 
                                 match rval.as_ref() {
@@ -381,14 +382,18 @@ impl Exp {
                     _ => {}
                 }
 
-                let lval = lhs.eval_max(scope, depth - 1)?;
-                let rval = rhs.eval_max(scope, depth - 1)?;
-                let (lval, rval) = match (lval, rval) {
-                    (Partial::Value(lval), Partial::Value(rval)) => (lval, rval),
-                    (lpart, rpart) => {
-                        return Ok(Partial::Exp(
-                            Rc::new(Exp::Binary(token.clone(), op.clone(), lpart.into_exp(), rpart.into_exp()))));
-                    }
+                let lval = match lhs.eval_max(scope, depth - 1)? {
+                    Partial::Value(val) => val,
+                    Partial::Exp(part) =>
+                        return Ok(Partial::Exp(Rc::new(Exp::Binary(
+                            token.clone(), op.clone(), part, Rc::clone(rhs)))))
+                };
+
+                let rval = match rhs.eval_max(scope, depth - 1)? {
+                    Partial::Value(val) => val,
+                    Partial::Exp(part) =>
+                        return Ok(Partial::Exp(Rc::new(Exp::Binary(
+                            token.clone(), op.clone(), Rc::new(Exp::Value(lval)), part))))
                 };
 
                 match lval.eval_binary(&token.token, rval.as_ref()) {
@@ -401,9 +406,9 @@ impl Exp {
                 let cval = cond.eval_max(scope, depth - 1)?;
                 let cval = match cval {
                     Partial::Value(val) => val,
-                    cpart => {
-                        return Ok(Partial::Exp(Rc::new(
-                            Exp::If(token.clone(), cpart.into_exp(), Rc::clone(texp), Rc::clone(fexp)))));
+                    Partial::Exp(part) => {
+                        return Ok(Partial::Exp(Rc::new(Exp::If(
+                            token.clone(), part, Rc::clone(texp), Rc::clone(fexp)))));
                     }
                 };
 
@@ -423,15 +428,18 @@ impl Exp {
                     Value::FnVal(scope.clone(), None, vec![Rc::clone(arg)], Rc::clone(exp))))),
 
             Exp::App(token, func, arg) => {
-                let fval = func.eval_max(scope, depth - 1)?;
-                let aval = arg.eval_max(scope, depth - 1)?;
+                let fval = match func.eval_max(scope, depth - 1)? {
+                    Partial::Value(val) => val,
+                    Partial::Exp(part) =>
+                        return Ok(Partial::Exp(Rc::new(Exp::App(
+                            token.clone(), part, Rc::clone(arg)))))
+                };
 
-                let (fval, aval) = match (fval, aval) {
-                    (Partial::Value(fval), Partial::Value(aval)) => (fval, aval),
-                    (fpart, apart) => {
-                        return Ok(Partial::Exp(Rc::new(
-                            Exp::App(token.clone(), fpart.into_exp(), apart.into_exp()))));
-                    }
+                let aval = match arg.eval_max(scope, depth - 1)? {
+                    Partial::Value(val) => val,
+                    Partial::Exp(part) =>
+                        return Ok(Partial::Exp(Rc::new(Exp::App(
+                            token.clone(), Rc::new(Exp::Value(fval)), part))))
                 };
 
                 match fval.as_ref() {
