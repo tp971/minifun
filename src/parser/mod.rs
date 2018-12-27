@@ -267,6 +267,10 @@ impl<I: Iterator<Item = io::Result<u8>>> Parser<I> {
                             match t.token {
                                 Token::COMMA => {
                                     self.lexer.next();
+                                    if let Token::RPAR = self.lexer.peek(0)?.token {
+                                        self.lexer.next();
+                                        break Ok(Rc::new(Exp::Tuple(token, res)));
+                                    }
                                     res.push(self.parse_exp()?);
                                     t = self.lexer.peek(0)?;
                                 },
@@ -394,6 +398,10 @@ impl<I: Iterator<Item = io::Result<u8>>> Parser<I> {
                             match t.token {
                                 Token::COMMA => {
                                     self.lexer.next();
+                                    if let Token::RPAR = self.lexer.peek(0)?.token {
+                                        self.lexer.next();
+                                        break Ok(Rc::new(Exp::Tuple(token, res)));
+                                    }
                                     res.push(self._parse_arg()?);
                                     t = self.lexer.peek(0)?;
                                 },

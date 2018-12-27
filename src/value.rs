@@ -253,14 +253,18 @@ impl fmt::Display for Value {
             Value::Str(s, _) =>
                 write!(f, "{:?}", s),
             Value::Tuple(exps) => {
-                write!(f, "(")?;
-                for (i, next) in exps.iter().enumerate() {
-                    if i > 0 {
-                        write!(f, ", ")?;
+                if exps.len() == 1 {
+                    write!(f, "({},)", &exps[0])
+                } else {
+                    write!(f, "(")?;
+                    for (i, next) in exps.iter().enumerate() {
+                        if i > 0 {
+                            write!(f, ", ")?;
+                        }
+                        write!(f, "{}", next)?;
                     }
-                    write!(f, "{}", next)?;
+                    write!(f, ")")
                 }
-                write!(f, ")")
             },
             Value::FnVal(_, _, args, _) => {
                 write!(f, "fn")?;
