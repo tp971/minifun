@@ -10,17 +10,17 @@ pub type Result<T> = std::result::Result<T, ParserError>;
 
 #[derive(Debug, Clone)]
 pub enum ParserError {
-    Lexer(usize, usize, String),
+    Lexer(String, usize, usize, String),
     Unexpected(TokenInfo, Vec<Token>)
 }
 
 impl fmt::Display for ParserError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            ParserError::Lexer(row, col, desc) =>
-                write!(f, "{}:{}: {}", row, col, desc),
+            ParserError::Lexer(source, row, col, desc) =>
+                write!(f, "{}:{}:{}: {}", source, row, col, desc),
             ParserError::Unexpected(token, expected) => {
-                write!(f, "{}:{}: unexpected {}", token.row, token.col, token)?;
+                write!(f, "{}:{}:{}: unexpected {}", token.source, token.row, token.col, token)?;
                 if !expected.is_empty() {
                     write!(f, ", expected ")?;
                     for (i, next) in expected.iter().enumerate() {

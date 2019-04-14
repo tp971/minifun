@@ -3,6 +3,7 @@ pub mod value;
 pub use self::value::*;
 
 use std::cmp;
+use std::collections::HashSet;
 use std::fmt;
 use std::rc::Rc;
 
@@ -242,10 +243,56 @@ impl Stmt {
                 }
             },
             Stmt::Fun(_, id, args, exp) => {
-                let scope2 = scope.clone();
+                let mut scope2 = Scope::new();
+                for next in self.unbound() {
+                    if let Some(val) = scope.get(&next) {
+                        scope2.insert(next, Rc::clone(val));
+                    }
+                }
                 scope.insert(id.clone(), Rc::new(
                     Value::FnVal(scope2, Some(id.clone()), args.clone(), Rc::clone(exp))));
                 Ok(None)
+            }
+        }
+    }
+
+    pub fn unbound(&self) -> HashSet<String> {
+        match self {
+            Stmt::Empty =>
+                HashSet::new(),
+            Stmt::Exp(_, exp) =>
+                exp.unbound(),
+            Stmt::Let(_, arg, exp) => {
+                let mut res = exp.unbound();
+                for next in arg.unbound() {
+                    res.remove(&next);
+                }
+                res
+            },
+            Stmt::Fun(_, id, args, exp) => {
+                let mut res = exp.unbound();
+                for arg in args {
+                    for next in arg.unbound() {
+                        res.remove(&next);
+                    }
+                }
+                res.remove(id);
+                res
+            }
+        }
+    }
+
+    pub fn defining(&self) -> HashSet<String> {
+        match self {
+            Stmt::Empty
+          | Stmt::Exp(_, _) =>
+                HashSet::new(),
+            Stmt::Let(_, arg, _) =>
+                arg.unbound(),
+            Stmt::Fun(_, id, _, _) => {
+                let mut res = HashSet::new();
+                res.insert(id.clone());
+                res
             }
         }
     }
@@ -421,11 +468,18 @@ impl Exp {
                         Err(EvalError::new(&token,
                             format!("invalid value for if condition: {}", val)))
                 }
-            }
+            },
 
-            Exp::FnExp(_, arg, exp) =>
+            Exp::FnExp(_, arg, exp) => {
+                let mut scope2 = Scope::new();
+                for next in self.unbound() {
+                    if let Some(val) = scope.get(&next) {
+                        scope2.insert(next, Rc::clone(val));
+                    }
+                }
                 Ok(Partial::Value(Rc::new(
-                    Value::FnVal(scope.clone(), None, vec![Rc::clone(arg)], Rc::clone(exp))))),
+                    Value::FnVal(scope2, None, vec![Rc::clone(arg)], Rc::clone(exp)))))
+            },
 
             Exp::App(token, func, arg) => {
                 let fval = match func.eval_max(scope, depth - 1)? {
@@ -466,6 +520,11 @@ impl Exp {
                             })
                         }
                     },
+                    Value::Intrinsic(ifn) =>
+                        match (ifn.f)(&scope, aval) {
+                            Ok(val) => Ok(Partial::Value(val)),
+                            Err(e) => Err(EvalError::new(&token, e))
+                        },
                     Value::Tuple(vals) => {
                         match aval.as_ref() {
                             Value::Tuple(vals2) if vals2.is_empty() =>
@@ -583,6 +642,76 @@ impl Exp {
                 1,
             Exp::Scope(_, exp) =>
                 1 + exp.depth()
+        }
+    }
+
+    pub fn unbound(&self) -> HashSet<String> {
+        match self {
+            Exp::BoolConst(_, _)
+          | Exp::IntConst(_, _)
+          | Exp::RealConst(_, _)
+          | Exp::CharConst(_, _)
+          | Exp::StrConst(_, _)
+          | Exp::Value(_) =>
+                HashSet::new(),
+            Exp::ID(_, id) => {
+                let mut res = HashSet::new();
+                res.insert(id.clone());
+                res
+            },
+            Exp::Tuple(_, exps) => {
+                let mut res = HashSet::new();
+                for next in exps.iter() {
+                    res.extend(next.unbound());
+                }
+                res
+            },
+            Exp::Unary(_, _, rhs) =>
+                rhs.unbound(),
+            Exp::Binary(_, _, lhs, rhs) => {
+                let mut res = lhs.unbound();
+                res.extend(rhs.unbound());
+                res
+            },
+            Exp::If(_, cond, texp, fexp) => {
+                let mut res = cond.unbound();
+                res.extend(texp.unbound());
+                res.extend(fexp.unbound());
+                res
+            },
+            Exp::FnExp(_, arg, exp) => {
+                let mut res = exp.unbound();
+                for next in arg.unbound() {
+                    res.remove(&next);
+                }
+                res
+            },
+            Exp::App(_, func, arg) => {
+                let mut res = func.unbound();
+                res.extend(arg.unbound());
+                res
+            },
+            Exp::Block(_, stmts, exp) => {
+                let mut res =
+                    match exp {
+                        Some(exp) => exp.unbound(),
+                        None => HashSet::new()
+                    };
+                for next in stmts.iter().rev() {
+                    res.extend(next.unbound());
+                    for next2 in next.defining() {
+                        res.remove(&next2);
+                    }
+                }
+                res
+            },
+            Exp::Scope(scope, exp) => {
+                let mut res = exp.unbound();
+                for next in scope.keys() {
+                    res.remove(next);
+                }
+                res
+            }
         }
     }
 }

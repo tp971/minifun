@@ -256,12 +256,14 @@ impl<I: Iterator<Item = io::Result<u8>>> Lexer<I> {
                 }
                 match num.parse::<f64>() {
                     Ok(num) => Ok(Token::REAL(num)),
-                    Err(_) => Err(ParserError::Lexer(row, col, "invalid number".to_string()))
+                    Err(_) => Err(ParserError::Lexer(
+                        self.source.clone(), row, col, "invalid number".to_string()))
                 }
             },
             _ => match num.parse::<i64>() {
                 Ok(num) => Ok(Token::INT(num)),
-                Err(_) => Err(ParserError::Lexer(row, col, "invalid number".to_string()))
+                Err(_) => Err(ParserError::Lexer(
+                    self.source.clone(), row, col, "invalid number".to_string()))
             }
         }
     }
@@ -270,12 +272,14 @@ impl<I: Iterator<Item = io::Result<u8>>> Lexer<I> {
         if c {
             match self.ch {
                 Some('\'') => {},
-                _ => return Err(ParserError::Lexer(self.row, self.col, "expected `\"`".to_string()))
+                _ => return Err(ParserError::Lexer(
+                    self.source.clone(), self.row, self.col, "expected `\"`".to_string()))
             }
         } else {
             match self.ch {
                 Some('"') => {},
-                _ => return Err(ParserError::Lexer(self.row, self.col, "expected `'`".to_string()))
+                _ => return Err(ParserError::Lexer(
+                    self.source.clone(), self.row, self.col, "expected `'`".to_string()))
             }
         }
 
@@ -291,12 +295,14 @@ impl<I: Iterator<Item = io::Result<u8>>> Lexer<I> {
                     self.ch = Some(ch as char);
                     self.row += 1;
                     self.col = 0;
-                    return Err(ParserError::Lexer(self.row, self.col, "unexpected newline".to_string()))
+                    return Err(ParserError::Lexer(
+                        self.source.clone(), self.row, self.col, "unexpected newline".to_string()))
                 },
                 Some(Ok(ch)) =>
                     s.push(ch),
                 _ =>
-                    return Err(ParserError::Lexer(self.row, self.col, "unexpected end of file".to_string()))
+                    return Err(ParserError::Lexer(
+                        self.source.clone(), self.row, self.col, "unexpected end of file".to_string()))
             };
         }
         let s = String::from_utf8_lossy(&s).to_string();
@@ -308,13 +314,15 @@ impl<I: Iterator<Item = io::Result<u8>>> Lexer<I> {
             let c = match it.next() {
                 Some(c) => c,
                 None =>
-                    return Err(ParserError::Lexer(self.row, self.col, "empty char constant".to_string()))
+                    return Err(ParserError::Lexer(
+                        self.source.clone(), self.row, self.col, "empty char constant".to_string()))
             };
             match it.next() {
                 None =>
                     Ok(Token::CHAR(c)),
                 Some(_) =>
-                    Err(ParserError::Lexer(self.row, self.col, "char constant longer than one char".to_string()))
+                    Err(ParserError::Lexer(
+                        self.source.clone(), self.row, self.col, "char constant longer than one char".to_string()))
             }
         } else {
             Ok(Token::STRING(s))
@@ -322,7 +330,8 @@ impl<I: Iterator<Item = io::Result<u8>>> Lexer<I> {
     }
 
     fn _error_skip(&mut self, desc: String) -> ParserError {
-        let res = ParserError::Lexer(self.row, self.col, desc);
+        let res = ParserError::Lexer(
+            self.source.clone(), self.row, self.col, desc);
         self._read();
         res
     }
